@@ -1,1 +1,1 @@
-print("Hello world")
+# This is a Ubuntu ENV
