@@ -1,32 +1,45 @@
-
-const vscode = require('vscode');
+const vscode = require("vscode")
 
 /**
  * @param {vscode.ExtensionContext} context
  */
-function activate(context) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "luminous-fortune-port-forward" is now active!');
+async function activate(context) {
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('luminous-fortune-port-forward.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
+	let disposable = vscode.commands.registerCommand(
+		"luminous-fortune-port-forward.port-forward",
+		async function () {
+			const userInput = await vscode.window.showInputBox({
+				prompt: 'Enter Port Number or Host Name with Port Number : ',
+				placeHolder: 'Enter here...',
+			});
+			if (userInput) {
+				// vscode.window.showInformationMessage(`Value is : ${userInput}`);
+				if(typeof userInput == 'number' && Number(userInput) != NaN){
+					vscode.window.showInformationMessage(`Value type is  Number: ${userInput}`);
+				}
+				else if(userInput == 'string' && userInput.split(":")){
+					const userinput = userInput.split(":");
+					const hostName = userinput[0];
+					const portNumber = userinput[1];
+					// TODO: Add Functionalities
+				}
+				else {
+					vscode.window.sshowErrorMessage(`Given String is invalid : ${userInput}`);
+				}
+			} else {
+				vscode.window.showWarningMessage('Port Forward ==> No input provided...');
+			}
+		}
+	)
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from luminous-fortune-port-forward!');
-	});
-
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(disposable)
 }
+exports.activate = activate
 
-// This method is called when your extension is deactivated
-function deactivate() {}
+function deactivate() { }
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
 }

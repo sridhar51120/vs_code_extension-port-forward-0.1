@@ -13,8 +13,8 @@
   "main": "./extension.js",
   "contributes": {
     "commands": [{
-      "command": "luminous-fortune-port-forward.helloWorld",
-      "title": "Hello World"
+      "command": "luminous-fortune-port-forward.port-forward",
+      "title": "Port Forward"
     }]
   },
   "scripts": {
