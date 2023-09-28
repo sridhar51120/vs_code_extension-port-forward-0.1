@@ -29,9 +29,21 @@ function tcp_Connection(sourcePort, destinationHost, destinationPort) {
     });
 }
 
+function UserAction(inputString, startString, endString) {
+    const startIndex = inputString.indexOf(startString);
+    const endIndex = inputString.indexOf(endString, startIndex + startString.length);
+
+    if (startIndex !== -1 && endIndex !== -1) {
+        return inputString.substring(startIndex + startString.length, endIndex);
+    } else {
+        return null;
+    }
+}
+
 function checkInputFormat(inputString, char1, char2) {
     return inputString.includes(char1) && inputString.includes(char2);
 }
+
 function activate(context) {
 
     let disposable = vscode.commands.registerCommand(
@@ -43,19 +55,63 @@ function activate(context) {
             });
             if ((typeof userInput === "string") && checkInputFormat(userInput, ':', '/')) {
                 // vscode.window.showInformationMessage("Success");
-                const data = userInput.split("/");
-                if (data[1] === 'tcp' || data[1] === 'TCP') {
-                    // vscode.window.showInformationMessage("Tcp Protocal Port Forwrding Methods");
-                    const datas = data[0].split(":");
-                    const hostname = datas[0];
-                    const portname = datas[1];
-                    vscode.window.showInformationMessage(`Port number ${portname},Host name ${hostname}`);
-                    // Port forwarding using TCP Connection
-                    tcp_Connection(portname,hostname,portname);
-                    vscode.window.showInformationMessage(`TCP Connection Success : host -> ${hostname}, Port Number -> ${portname}`)
+                const userNetwork = UserAction(userInput, "/", "-");
+                const hostName = UserAction(userInput, "", ":");
+                const portNumber = UserAction(userInput, ":", "/");
+                const userAction = userInput.split("-")[1]
+                
+                const extensionConfigDetails = vscode.workspace.getConfiguration('luminous-fortune-port-forward');
+
+                if  (userNetwork === 'tcp' || userNetwork === 'TCP') {
+
+                    // console.log(`User Network : ${userNetwork}`)
+                    // console.log(`HostName : ${hostName}`);
+                    // console.log(`PortName: ${portNumber}`);
+
+                    const data = {
+                        "hostname": hostName,
+                        "port": portNumber,
+                        "type": userNetwork,
+                        "action":userAction
+                    }
+                    // create or retive the Port Details in Configuration file
+                    const portDetails = extensionConfigDetails.get('PortDetails', []);
+                    // console.log(data)
+                    if (userAction === "add") {
+                        // Add Port Details to Configuration files
+                        // Add the new value to the array
+                        portDetails.push(data);
+                        // Update the configuration with the modified array
+                        extensionConfigDetails.update('PortDetails', portDetails, vscode.ConfigurationTarget.Global);
+                        vscode.window.showInformationMessage(`Port is Forwared to Hostname : ${hostName} and PortName : ${portNumber}`);
+
+                        console.log(`Added : ${data}`);
+
+                    } else if (userAction === "remove") {
+                        // Remove Port Details in Configuration file
+                        // Remove the selected value from the array
+                        const updatedValues = portDetails.filter((value) => value !== data);
+                        // Update the configuration with the modified array
+                        extensionConfigDetails.update('PortDetails', updatedValues, vscode.ConfigurationTarget.Global);
+                        vscode.window.showInformationMessage(`Removed: ${data}`);
+                        console.log(`Removed: ${data}`);
+                        portDetails.forEach((portDetail, index) => {
+                            console.log(`details : ${portDetail[0]}`);
+                        });
+                    }
+                    else {
+                        // Show the Configuaration values
+                        // console.log(portDetails[0]);
+                        portDetails.forEach((portDetail, index) => {
+                            console.log(`details : ${portDetail[0]}`);
+                        });
+
+                    }
+
+                    // vscode.window.showInformationMessage(`TCP Connection details added : host -> ${hostname}, Port Number -> ${portname}`)
 
                 }
-                else if (data[1] === 'udp' || data[1] === 'UDP') {
+                else if (userNetwork === 'udp' || userNetwork === 'UDP') {
                     vscode.window.showInformationMessage("UDP Protocal Port Forwrding Methods");
                 }
                 else {
