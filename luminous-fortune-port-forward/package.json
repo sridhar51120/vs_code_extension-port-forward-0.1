@@ -11,7 +11,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand: luminous-fortune-port-forward.startTask"
+    "onCommand: luminous-fortune-port-forward.status-bar"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -21,13 +21,8 @@
         "title": "Port Forward"
       },
       {
-        "command": "luminous-fortune-port-forward.startTask",
-        "title": "Show Progress"
-      },
-      {
-        "command": "luminous-fortune-port-forward.showWarningWithActions",
-        "title": "Show Warning Notification With Actions",
-        "category": "Notifications Sample"
+        "command": "luminous-fortune-port-forward.status-bar",
+        "title": "Status bar"
       }
     ]
   },
