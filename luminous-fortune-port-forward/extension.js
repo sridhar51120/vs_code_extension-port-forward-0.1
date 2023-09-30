@@ -57,11 +57,28 @@ function checkInputFormat(inputString, char1, char2) {
 	return inputString.includes(char1) && inputString.includes(char2);
 }
 
+function isPortInUse(port) {
+	return new Promise((resolve) => {
+		const server = net.createServer()
+			.once('error', (err) => {
+				if (err.code === 'EADDRINUSE') {
+					resolve(true); // Port is in use
+				} else {
+					resolve(false); // Other error
+				}
+			})
+			.once('listening', () => {
+				server.close();
+				resolve(false); // Port is not in use
+			})
+			.listen(port, '127.0.0.1');
+	});
+}
+
 function activate(context) {
 
 	context.subscriptions.push(vscode.commands.registerCommand(
 		"luminous-fortune-port-forward.port-forward",
-
 		async function () {
 			const userInput = await vscode.window.showInputBox({
 				prompt: 'Enter source Port Number or source Host Name with Port Number : ',
@@ -74,69 +91,48 @@ function activate(context) {
 				const portNumber = UserAction(userInput, ":", "/");
 				const userAction = userInput.split("-")[1]
 
-				const extensionConfigDetails = vscode.workspace.getConfiguration('luminous-fortune-port-forward');
-
-				if (userNetwork === 'tcp' || userNetwork === 'TCP') {
-
-					// console.log(`User Network : ${userNetwork}`)
-					// console.log(`HostName : ${hostName}`);
-					// console.log(`PortName: ${portNumber}`);
-
-					const data = {
-						"hostname": hostName,
-						"port": portNumber,
-						"type": userNetwork,
-						"action": userAction
-					}
-					// create or retive the Port Details in Configuration file
-					const portDetails = extensionConfigDetails.get('PortDetails', []);
-					// console.log(data)
-					if (userAction === "add") {
-						// TODO: when the user adds the details,show dialog check if the details is correct or not
-						//  --> if correct which means add the details to config file else don't
-
-
-						// Add Port Details to Configuration files
-						// Add the new value to the array
-						// portDetails.push(data);
-						// // Update the configuration with the modified array
-						// extensionConfigDetails.update('PortDetails', portDetails, vscode.ConfigurationTarget.Global);
-						// vscode.window.showInformationMessage(`Port is Forwared to Hostname : ${hostName} and PortName : ${portNumber}`);
-
-						// console.log(`Added : ${data}`);
+				isPortInUse(portNumber)
+					.then((inUse) => {
+						if (inUse) {
+							vscode.window.showErrorMessage("Port is already Allocated...");
+						} else {
+							const infoPortDetails = `HostName : ${hostName}\nPortName : ${portNumber}\nNetwork : ${userNetwork}`;
+							vscode.window.showInformationMessage("Port is Not Available");
+							vscode.window.showWarningMessage(
+								`Shall I start the port forwarding action?\n${infoPortDetails}`,
+								'Yes', 'No'
+							)
+								.then((selectedAction) => {
+									if (selectedAction === 'Yes') {
+										vscode.window.withProgress({
+											location: vscode.ProgressLocation.Notification,
+											title: 'Running Port Forwarding Task',
+											cancellable: true
+										}, async (progress, token) => {
+											const totalSteps = 100;
+											for (let step = 0; step < totalSteps; step++) {
+												if (token.isCancellationRequested) {
+													vscode.window.showInformationMessage('Port Forward tesk was Cancelled...');
+													break;
+												}
 
 
+												progress.report({ increment: (100 / totalSteps) });
 
-					} else if (userAction === "remove") {
-						// Remove Port Details in Configuration file
-						// Remove the selected value from the array
-						const updatedValues = portDetails.filter((value) => value !== data);
-						// Update the configuration with the modified array
-						extensionConfigDetails.update('PortDetails', updatedValues, vscode.ConfigurationTarget.Global);
-						vscode.window.showInformationMessage(`Removed: ${data}`);
-						console.log(`Removed: ${data}`);
-						portDetails.forEach((portDetail, index) => {
-							console.log(`details : ${portDetail[0]}`);
-						});
-					}
-					else {
-						// Show the Configuaration values
-						// console.log(portDetails[0]);
-						// portDetails.forEach((portDetail, index) => {
-						// 	console.log(`details : ${portDetail[0]}`);
-						// });
+												await new Promise(resolve => setTimeout(resolve, 100));
+											}
 
-					}
-
-					// vscode.window.showInformationMessage(`TCP Connection details added : host -> ${hostname}, Port Number -> ${portname}`)
-
-				}
-				else if (userNetwork === 'udp' || userNetwork === 'UDP') {
-					vscode.window.showInformationMessage("UDP Protocal Port Forwrding Methods");
-				}
-				else {
-					vscode.window.showErrorMessage("Invalid Network method...");
-				}
+											// vscode.window.showInformationMessage('Port Forwarding was successfully Completed...');
+										});
+									} else if (selectedAction === 'No') {
+										vscode.window.showInformationMessage('Port Forward tesk was Cancelled by the User...');
+									}
+								})
+						}
+					})
+					.catch((error) => {
+						console.error(`Error checking port: ${error.message}`);
+					});
 
 			} else {
 				vscode.window.showErrorMessage("Invalid Input values...");
@@ -181,9 +177,9 @@ function activate(context) {
 				} else if (selectedAction === 'Cancel') {
 					vscode.window.showInformationMessage('Your Task will be canced..');
 				}
-			});
+			})
 	})
-	);
+	)
 }
 exports.activate = activate
 
