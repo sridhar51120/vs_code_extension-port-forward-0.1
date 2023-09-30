@@ -1,44 +1,80 @@
 
 const vscode = require('vscode');
 const net = require('net')
-const {
-	ExtensionContext,
-	StatusBarAlignment,
-	window,
-	StatusBarItem,
-	Selection,
-	workspace,
-	TextEditor,
-	commands,
-	ProgressLocation
-} = vscode;
+// we can use the inbuild methods in vscode in Js
+// const { 
+// 	ExtensionContext,
+// 	StatusBarAlignment,
+// 	window,
+// 	StatusBarItem,
+// 	Selection,
+// 	workspace,
+// 	TextEditor,
+// 	commands,
+// 	ProgressLocation
+// } = vscode;
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 
+async function forwardPortWithProgress(sourcePort, destinationPort, destinationHost) {
+	const totalSteps = 100;
+	const progressTitle = 'Port Forwarding Progress';
+	// const currentTime = new Date().toLocaleTimeString();
+    // const debugMessage = `[${currentTime}] ${message}`;
+	const progressMessage = 'Forwarding traffic...';
+	console.log(`Port Forwarding starts --> HostName : ${destinationHost} and Port Number : ${destinationPort}`);
+	console.log("Port Forwarding Progress Starts")
+	await vscode.window.withProgress({
+		location: vscode.ProgressLocation.Notification,
+		title: progressTitle,
+		cancellable: true,
+	}, async (progress, token) => {
+		progress.report({ increment: 0, message: progressMessage });
 
-function tcp_Connection(sourcePort, destinationHost, destinationPort) {
-	const server = net.createServer((sourceSocket) => {
+		try {
+			const server = net.createServer((sourceSocket) => {
+				const destinationSocket = net.connect(destinationPort, destinationHost, () => {
+					sourceSocket.pipe(destinationSocket);
+					destinationSocket.pipe(sourceSocket);
+				});
 
-		const destinationSocket = net.connect(destinationPort, destinationHost);
+				sourceSocket.on('error', (err) => {
+					console.error('Source socket error:', err);
+				});
 
-		sourceSocket.pipe(destinationSocket);
-		destinationSocket.pipe(sourceSocket);
+				destinationSocket.on('error', (err) => {
+					console.error('Destination socket error:', err);
+				});
+				sourceSocket.on('end', () => {
+					destinationSocket.end();
+				});
 
-		sourceSocket.on('close', () => {
-			console.log('Source socket closed');
-			destinationSocket.end();
-		});
+				destinationSocket.on('end', () => {
+					sourceSocket.end();
+				});
+			});
+			server.listen(sourcePort, () => {
+				console.log(`Port forwarding server is listening on port ${sourcePort}`);
+			});
+			for (let step = 0; step < totalSteps; step++) {
+				if (token.isCancellationRequested) {
+					vscode.window.showInformationMessage('Port Forwarding was canceled.');
+					break;
+				}
 
-		destinationSocket.on('close', () => {
-			console.log('Destination socket closed');
-			sourceSocket.end();
-		});
-	});
+				const increment = 100 / totalSteps;
+				progress.report({ increment, message: progressMessage });
 
-	server.listen(sourcePort, () => {
-		vscode.window.showInformationMessage(`TCP server listening on port ${sourcePort} and forwarding to ${destinationHost}:${destinationPort}`);
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+
+			vscode.window.showInformationMessage('Port Forwarding completed.');
+
+		} catch (error) {
+			vscode.window.showErrorMessage('Port Forwarding encountered an error: ' + error.message);
+		}
 	});
 }
 
@@ -86,45 +122,47 @@ function activate(context) {
 			});
 			if ((typeof userInput === "string") && checkInputFormat(userInput, ':', '/')) {
 				// vscode.window.showInformationMessage("Success");
-				const userNetwork = UserAction(userInput, "/", "-");
 				const hostName = UserAction(userInput, "", ":");
 				const portNumber = UserAction(userInput, ":", "/");
-				const userAction = userInput.split("-")[1]
+				const userAction = userInput.split("/")[1]
+
+				console.log(`User Action : ${userAction}`)
+				console.log(`HostName : ${hostName}`);
+				console.log(`PortName: ${portNumber}`);
 
 				isPortInUse(portNumber)
 					.then((inUse) => {
 						if (inUse) {
 							vscode.window.showErrorMessage("Port is already Allocated...");
 						} else {
-							const infoPortDetails = `HostName : ${hostName}\nPortName : ${portNumber}\nNetwork : ${userNetwork}`;
+							const infoPortDetails = `HostName : ${hostName}\nPortName : ${portNumber}`;
 							vscode.window.showInformationMessage("Port is Not Available");
 							vscode.window.showWarningMessage(
 								`Shall I start the port forwarding action?\n${infoPortDetails}`,
 								'Yes', 'No'
 							)
 								.then((selectedAction) => {
+									const extensionConfigDetails = vscode.workspace.getConfiguration('luminous-fortune-port-forward');
 									if (selectedAction === 'Yes') {
-										vscode.window.withProgress({
-											location: vscode.ProgressLocation.Notification,
-											title: 'Running Port Forwarding Task',
-											cancellable: true
-										}, async (progress, token) => {
-											const totalSteps = 100;
-											for (let step = 0; step < totalSteps; step++) {
-												if (token.isCancellationRequested) {
-													vscode.window.showInformationMessage('Port Forward tesk was Cancelled...');
-													break;
-												}
-
-
-												progress.report({ increment: (100 / totalSteps) });
-
-												await new Promise(resolve => setTimeout(resolve, 100));
+										if (userAction == "add") {
+											const portDetails = extensionConfigDetails.get('PortDetails', []);
+											const data = {
+												"hostname": hostName,
+												"port": portNumber,
+												"action": userAction
 											}
+											console.log(`Data : ${data}`)
+											portDetails.push(data);
+											// // Update the configuration with the modified array
+											extensionConfigDetails.update('PortDetails', portDetails, vscode.ConfigurationTarget.Global);
+											vscode.window.showInformationMessage(`Port is Forwared to Hostname : ${hostName} and PortName : ${portNumber}`);
+											console.log(`Added : ${data}`);
+											// forwardPortWithProgress(sourcePort, destinationPort, destinationHost)
+											forwardPortWithProgress(portNumber, portNumber, 'localhost')
+										}
 
-											// vscode.window.showInformationMessage('Port Forwarding was successfully Completed...');
-										});
-									} else if (selectedAction === 'No') {
+									}
+									else if (selectedAction === 'No') {
 										vscode.window.showInformationMessage('Port Forward tesk was Cancelled by the User...');
 									}
 								})
@@ -140,45 +178,6 @@ function activate(context) {
 
 		}
 	)
-	);
-	context.subscriptions.push(vscode.commands.registerCommand('luminous-fortune-port-forward.showWarningWithActions', () => {
-		vscode.window
-			.showWarningMessage(
-				'Shall I Start Port forwarding',
-				'Add', 'Cancel'
-			)
-			.then((selectedAction) => {
-				if (selectedAction === 'Add') {
-					// vscode.window.showInformationMessage('You clicked Action 1');
-					vscode.window.withProgress({
-						location: vscode.ProgressLocation.Notification, // Display in the notification area
-						title: 'Running Long Task', // Title of the progress notification
-						cancellable: true // Allow users to cancel the task
-					}, async (progress, token) => {
-						// Simulate a long-running task
-						const totalSteps = 100;
-						for (let step = 0; step < totalSteps; step++) {
-							if (token.isCancellationRequested) {
-								// Task was canceled by the user
-								vscode.window.showInformationMessage('Task canceled by the user.');
-								break;
-							}
-
-							// Update progress
-							progress.report({ increment: (100 / totalSteps) });
-
-							// Simulate a delay
-							await new Promise(resolve => setTimeout(resolve, 100));
-						}
-
-						// Task completed
-						vscode.window.showInformationMessage('Long task completed.');
-					});
-				} else if (selectedAction === 'Cancel') {
-					vscode.window.showInformationMessage('Your Task will be canced..');
-				}
-			})
-	})
 	)
 }
 exports.activate = activate
