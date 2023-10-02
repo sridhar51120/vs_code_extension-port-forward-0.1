@@ -20,12 +20,9 @@ const net = require('net');
 async function forwardPortWithProgress(sourcePort, sourceHost, destinationPort, destinationHost, startTime) {
     const totalSteps = 100;
     const progressTitle = 'Port Forwarding Progress';
-    // const currentTime = new Date().toLocaleTimeString();
-    // const debugMessage = `[${currentTime}] ${message}`;
     const progressMessage = 'Forwarding traffic...';
     console.log(`Port Forwarding starts --> HostName : ${destinationHost} and Port Number : ${destinationPort}`);
     console.log("Port Forwarding Progress Starts")
-    console.log(`The process Starts at [ ${startTime} ]`);
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: progressTitle,
@@ -81,10 +78,13 @@ async function forwardPortWithProgress(sourcePort, sourceHost, destinationPort, 
                     vscode.window.showInformationMessage(`Port is Forwared to Hostname : ${destinationHost} and PortName : ${destinationPort}`);
                 }
             }
+            return true;
         } catch (error) {
             vscode.window.showErrorMessage('Port Forwarding encountered an error: ' + error.message);
+            return false;
         }
     });
+    return true;
 }
 
 function getWebviewContent(tableRows) {
@@ -148,6 +148,12 @@ function createPanel(userDetails) {
 }
 // Showing the Port Details so collect the Port details From Config File from Vs code Workspace
 const statusBarPortDetails = [];
+const data = {
+    "hostname": 'localhost',
+    "port": 500,
+    "action": 'add'
+}
+statusBarPortDetails.push(data);
 
 function UserAction(inputString, startString, endString) {
     const startIndex = inputString.indexOf(startString);
@@ -183,12 +189,15 @@ function isPortInUse(port) {
 }
 
 function activate(context) {
-
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right);
-    statusBarItem.text = "Port Forward - Dsscv";
-    statusBarItem.tooltip = "Click to view Assigned Ports";
-    statusBarItem.command = "luminous-fortune-port-forward.status-bar";
-    statusBarItem.show();
+    if (statusBarPortDetails === undefined) {
+        vscode.window.showInformationMessage("None of the Ports are Assigned..\nAdd Ports and Try again..")
+    } else {
+        const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right);
+        statusBarItem.text = "Port Forward - Dsscv";
+        statusBarItem.tooltip = "Click to view Assigned Ports";
+        statusBarItem.command = "luminous-fortune-port-forward.status-bar";
+        statusBarItem.show();
+    }
 
     vscode.commands.registerCommand('luminous-fortune-port-forward.status-bar', () => {
         const panel = createPanel(statusBarPortDetails);
@@ -252,7 +261,7 @@ function activate(context) {
                                                 portDetails.forEach(portdetail => {
                                                     statusBarPortDetails.push(portdetail)
                                                 });
-                                                console.log(`Status bar ${statusBarPortDetails}`)
+                                                // console.log(`Status bar ${statusBarPortDetails}`)
                                             }
                                             else if (selectedAction === 'No') {
                                                 vscode.window.showInformationMessage('Port Forward tesk was Cancelled by the User...');
@@ -292,10 +301,7 @@ function activate(context) {
                             })
                     }
                     else {
-                        vscode.commands.registerCommand('luminous-fortune-port-forward.status-bar', () => {
-                            const panel = createPanel(statusBarPortDetails);
-                            panel.reveal(vscode.ViewColumn.One);
-                        });
+                        vscode.window.showErrorMessage("Invalid User Operation.. /nPlease try Add (or) remove => Operations")
                     }
                 } else {
                     vscode.window.showErrorMessage("Invalid Port Number... Chack your Input Port Number...")
@@ -345,7 +351,7 @@ function activate(context) {
                                                 portDetails.forEach(portdetail => {
                                                     statusBarPortDetails.push(portdetail)
                                                 });
-                                                console.log(`Status bar ${statusBarPortDetails}`)
+                                                // console.log(`Status bar ${statusBarPortDetails}`)
                                             }
                                             else if (selectedAction === 'No') {
                                                 vscode.window.showInformationMessage('Port Forward tesk was Cancelled by the User...');
@@ -382,10 +388,7 @@ function activate(context) {
                             })
                     }
                     else {
-                        vscode.commands.registerCommand('luminous-fortune-port-forward.status-bar', () => {
-                            const panel = createPanel(statusBarPortDetails);
-                            panel.reveal(vscode.ViewColumn.One);
-                        });
+                        vscode.window.showErrorMessage("Invalid User Operation.. /nPlease try add (or) remove => Operations")
                     }
                 } else {
                     vscode.window.showErrorMessage("Invalid Port Number... Chack your Input Port Number...")
@@ -397,9 +400,44 @@ function activate(context) {
         }
     )
     )
+
+    vscode.extensions.onDidChange(() => {
+        if (statusBarPortDetails === undefined) {
+            return;
+        } else {
+            // forwardPortWithProgress(sourcePort, sourceHost, destinationPort, destinationHost, startTime)
+            const startTime = new Date();
+            // Dafultly Run the Previous Configuration files (or) Existing Congfigured Port detatils
+            async function processPorts() {
+                for (const portDetails of statusBarPortDetails) {
+                    const [hostName, portNumber, userAction] = portDetails;
+                    await forwardPortWithProgress(
+                        portNumber,
+                        hostName,
+                        portNumber,
+                        hostName,
+                        startTime
+                    );
+                }
+            }
+
+            processPorts()
+                .then(() => {
+                    console.log('All ports processed successfully.');
+                    const endTime = new Date();
+                    const totalTime = endTime - startTime;
+                    console.log(`Total time taken: ${totalTime} ms`);
+                })
+                .catch((error) => {
+                    console.error('Error processing ports:', error);
+                });
+        }
+    });
 }
 
+
 exports.activate = activate
+
 function deactivate() { }
 
 module.exports = {
